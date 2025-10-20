@@ -6,17 +6,16 @@ import path from 'path'
 const isProduction = process.env.NODE_ENV === 'production'
 const base = process.env.BASE || '/'
 const ABORT_DELAY = 10000
-
 const __dirname = path.dirname(new URL(import.meta.url).pathname)
 
-// Cached template
+// Cache template
 const templateHtml = isProduction
-  ? await fs.readFile(path.join(__dirname, 'index.html'), 'utf-8')
+  ? await fs.readFile(path.join(__dirname, 'dist', 'client', 'index.html'), 'utf-8')
   : ''
 
 const app = express()
 
-// Vite dev server middleware
+// Dev server middleware
 let vite
 if (!isProduction) {
   const { createServer } = await import('vite')
@@ -30,7 +29,7 @@ if (!isProduction) {
   const compression = (await import('compression')).default
   const sirv = (await import('sirv')).default
   app.use(compression())
-  app.use(base, sirv(path.join(__dirname, 'dist'), { extensions: [] }))
+  app.use(base, sirv(path.join(__dirname, 'dist', 'client'), { extensions: [] }))
 }
 
 // SSR route
@@ -90,5 +89,5 @@ app.use('*', async (req, res) => {
   }
 })
 
-// ✅ Export app for Vercel serverless
+// Export app for Vercel
 export default app
