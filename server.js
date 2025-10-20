@@ -1,51 +1,46 @@
 import fs from 'node:fs/promises'
 import express from 'express'
 import { Transform } from 'node:stream'
+import path from 'path'
 
-// Constants
 const isProduction = process.env.NODE_ENV === 'production'
-const port = process.env.PORT || 5173
 const base = process.env.BASE || '/'
 const ABORT_DELAY = 10000
 
-// Cached production assets
+const __dirname = path.dirname(new URL(import.meta.url).pathname)
+
+// Cached template
 const templateHtml = isProduction
-  ? await fs.readFile('./dist/client/index.html', 'utf-8')
+  ? await fs.readFile(path.join(__dirname, 'index.html'), 'utf-8')
   : ''
 
-// Create http server
 const app = express()
 
-// Add Vite or respective production middlewares
-/** @type {import('vite').ViteDevServer | undefined} */
+// Vite dev server middleware
 let vite
 if (!isProduction) {
   const { createServer } = await import('vite')
   vite = await createServer({
     server: { middlewareMode: true },
     appType: 'custom',
-    base,
+    base
   })
   app.use(vite.middlewares)
 } else {
   const compression = (await import('compression')).default
   const sirv = (await import('sirv')).default
   app.use(compression())
-  app.use(base, sirv('./dist/client', { extensions: [] }))
+  app.use(base, sirv(path.join(__dirname, 'dist'), { extensions: [] }))
 }
 
-// Serve HTML
-app.use('*all', async (req, res) => {
+// SSR route
+app.use('*', async (req, res) => {
   try {
     const url = req.originalUrl.replace(base, '')
+    let template, render
 
-    /** @type {string} */
-    let template
-    /** @type {import('./src/entry-server.js').render} */
-    let render
     if (!isProduction) {
-      // Always read fresh template in development
-      template = await fs.readFile('./index.html', 'utf-8')
+      template = await fs.readFile(path.join(__dirname, 'index.html'), 'utf-8')
       template = await vite.transformIndexHtml(url, template)
       render = (await vite.ssrLoadModule('/src/entry-server.jsx')).render
     } else {
@@ -54,7 +49,6 @@ app.use('*all', async (req, res) => {
     }
 
     let didError = false
-
     const { pipe, abort } = render(url, {
       onShellError() {
         res.status(500)
@@ -65,32 +59,21 @@ app.use('*all', async (req, res) => {
         res.status(didError ? 500 : 200)
         res.set({ 'Content-Type': 'text/html' })
 
-        const [htmlStart, htmlEnd] = template.split(`<!--app-html-->`)
-        let htmlEnded = false
-
+        const [htmlStart, htmlEnd] = template.split('<!--app-html-->')
         const transformStream = new Transform({
           transform(chunk, encoding, callback) {
-            // See entry-server.jsx for more details of this code
-            if (!htmlEnded) {
-              chunk = chunk.toString()
-              if (chunk.endsWith('<vite-streaming-end></vite-streaming-end>')) {
-                res.write(chunk.slice(0, -41) + htmlEnd, 'utf-8')
-              } else {
-                res.write(chunk, 'utf-8')
-              }
+            chunk = chunk.toString()
+            if (chunk.endsWith('<vite-streaming-end></vite-streaming-end>')) {
+              res.write(chunk.slice(0, -41) + htmlEnd, 'utf-8')
             } else {
-              res.write(chunk, encoding)
+              res.write(chunk, 'utf-8')
             }
             callback()
           },
         })
 
-        transformStream.on('finish', () => {
-          res.end()
-        })
-
+        transformStream.on('finish', () => res.end())
         res.write(htmlStart)
-
         pipe(transformStream)
       },
       onError(error) {
@@ -99,14 +82,13 @@ app.use('*all', async (req, res) => {
       },
     })
 
-    setTimeout(() => {
-      abort()
-    }, ABORT_DELAY)
+    setTimeout(() => abort(), ABORT_DELAY)
   } catch (e) {
     vite?.ssrFixStacktrace(e)
-    console.log(e.stack)
+    console.error(e.stack)
     res.status(500).end(e.stack)
   }
 })
 
+// ✅ Export app for Vercel serverless
 export default app
