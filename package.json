@@ -1,0 +1,30 @@
+{
+  "name": "virtualr",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build --outDir dist/client",
+    "build:server": "vite build --ssr src/entry-server.jsx --outDir dist/server",
+    "preview": "cross-env NODE_ENV=production node server"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "compression": "^1.8.1",
+    "express": "^5.1.0",
+    "lucide-react": "^0.546.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "sirv": "^3.0.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react-swc": "^4.0.1",
+    "autoprefixer": "^10.4.21",
+    "cross-env": "^10.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.14",
+    "vite": "^7.1.5"
+  }
+}
