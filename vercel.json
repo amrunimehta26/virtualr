@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
   "builds": [
     { "src": "server.js", "use": "@vercel/node" },
     { "src": "dist/client/**", "use": "@vercel/static" }
